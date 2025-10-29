@@ -74,10 +74,4 @@ export const api = {
       await http.post(`/api/admin/reset`);
     return response.data;
   },
-
-  async dropDatabase(): Promise<{ ok: boolean; message: string }> {
-    const response: AxiosResponse<{ ok: boolean; message: string }> =
-      await http.post(`/api/admin/drop`);
-    return response.data;
-  },
 };

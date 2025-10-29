@@ -87,19 +87,6 @@ export default function Dashboard() {
     }
   }, [queryClient]);
 
-  const handleDrop = useCallback(async () => {
-    const ok = window.confirm(
-      "Drop database? This will drop and re-create all tables."
-    );
-    if (!ok) return;
-    try {
-      await api.dropDatabase();
-      await queryClient.invalidateQueries({ queryKey: ["metrics"] });
-    } catch (e: unknown) {
-      console.error(e);
-    }
-  }, [queryClient]);
-
   if (error instanceof Error)
     return <div className="text-red-600">Error: {error.message}</div>;
   if (isLoading || !data) return <div>Loading...</div>;
@@ -126,12 +113,6 @@ export default function Dashboard() {
           className="px-3 py-1.5 rounded border border-gray-300 cursor-pointer"
         >
           Reset Data
-        </button>
-        <button
-          onClick={handleDrop}
-          className="px-3 py-1.5 rounded border border-gray-300 cursor-pointer"
-        >
-          Drop DB
         </button>
       </div>
       {csvPreview && (
