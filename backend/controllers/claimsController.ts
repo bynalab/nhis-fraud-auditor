@@ -1,11 +1,16 @@
 import { Request, Response } from "express";
-import { Op } from "sequelize";
+import { Op, Sequelize } from "sequelize";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { parse } from "csv-parse/sync";
-import { Claim, Procedure, Provider } from "../db";
-import { computeFraudScore } from "../utils/heuristic";
+import { Claim, Procedure, Provider, sequelize } from "../db";
+import {
+  computeFraudScore,
+  calculateStandardDeviation,
+  getFraudCategoryFromScore,
+} from "../utils/heuristic";
+import { convertToCents } from "../utils/currency";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -60,8 +65,12 @@ export async function listClaims(req: Request, res: Response) {
 }
 
 export async function uploadClaims(req: Request, res: Response) {
+  const transaction = await sequelize.transaction();
+
   try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
 
     const csvContent = fs.readFileSync(req.file.path, "utf8");
     const records = parse(csvContent, {
@@ -69,38 +78,31 @@ export async function uploadClaims(req: Request, res: Response) {
       skip_empty_lines: true,
     }) as any[];
 
-    let inserted = 0;
-    for (const r of records) {
-      const chargeDollars = Number(r.claim_charge || r.claimCharge || "0");
-      try {
-        await Claim.create({
-          claim_id: r.claim_id || r.claimId,
-          patient_id: r.patient_id || null,
-          provider_id: r.provider_id || null,
-          provider_type: r.provider_type || null,
-          procedure_code: r.procedure_code || null,
-          claim_charge: chargeDollars,
-          claim_date: r.service_date || r.claim_date || null,
-        });
-        inserted++;
-      } catch (e: any) {
-        // ignore duplicates
-      }
-    }
+    // ✅ Normalize & prepare claims
+    const claimsToInsert = records.map((r) => ({
+      claim_id: r.claim_id || r.claimId,
+      patient_id: r.patient_id || null,
+      provider_id: r.provider_id || null,
+      provider_type: r.provider_type || null,
+      procedure_code: r.procedure_code || null,
+      claim_charge: Number(r.claim_charge || r.claimCharge || "0"),
+      claim_date: r.service_date || r.claim_date || null,
+    }));
 
-    // Rebuild procedures
-    await Procedure.destroy({ where: {}, truncate: true });
+    // ✅ Bulk insert with duplicate ignoring
+    await Claim.bulkCreate(claimsToInsert, {
+      ignoreDuplicates: true,
+      transaction,
+    });
+
+    // ✅ Rebuild procedure stats
+    await Procedure.destroy({ where: {}, truncate: true, transaction });
+
     const statsData = (await Claim.findAll({
       attributes: [
         "procedure_code",
-        [
-          Claim.sequelize!.fn("AVG", Claim.sequelize!.col("claim_charge")),
-          "avg_charge",
-        ],
-        [
-          Claim.sequelize!.fn("COUNT", Claim.sequelize!.col("id")),
-          "total_claims",
-        ],
+        [Sequelize.fn("AVG", Sequelize.col("claim_charge")), "avg_charge"],
+        [Sequelize.fn("COUNT", Sequelize.col("id")), "total_claims"],
       ],
       where: { procedure_code: { [Op.ne]: null } },
       group: ["procedure_code"],
@@ -113,62 +115,63 @@ export async function uploadClaims(req: Request, res: Response) {
         attributes: ["claim_charge"],
         raw: true,
       })) as any[];
+
       const charges = procedureClaims.map((c) => c.claim_charge as number);
-      const avg = stat.avg_charge as number;
-      const variance =
-        charges.length > 1
-          ? charges.reduce((s, v) => s + Math.pow(v - avg, 2), 0) /
-            (charges.length - 1)
-          : 0;
-      const stdDev = Math.sqrt(variance);
-      await Procedure.create({
-        procedure_code: stat.procedure_code,
-        avg_charge: avg,
-        std_dev: stdDev,
-        total_claims: stat.total_claims,
-      });
+
+      const averageCharge = stat.avg_charge as number;
+      const stdDev = calculateStandardDeviation(charges, averageCharge);
+      await Procedure.create(
+        {
+          procedure_code: stat.procedure_code,
+          avg_charge: averageCharge,
+          std_dev: stdDev,
+          total_claims: stat.total_claims,
+        },
+        { transaction }
+      );
     }
 
-    // Recompute fraud fields for all claims
-    const allClaims = await Claim.findAll();
+    // ✅ Compute fraud scores
+    const allClaims = await Claim.findAll({ transaction });
     for (const claim of allClaims) {
-      const proc = claim.procedure_code
-        ? await Procedure.findOne({
-            where: { procedure_code: claim.procedure_code },
-          })
-        : null;
-      const resScore = computeFraudScore({
-        claimChargeCents: Math.round((claim.claim_charge as number) * 100),
-        avgChargeCents: proc
-          ? Math.round((proc.avg_charge as number) * 100)
-          : null,
-        stdChargeCents: proc
-          ? Math.round((proc.std_dev as number) * 100)
-          : null,
+      let procedure: Procedure | null = null;
+      if (claim.procedure_code) {
+        procedure = await Procedure.findOne({
+          where: { procedure_code: claim.procedure_code },
+          transaction,
+        });
+      }
+
+      const fraudResult = computeFraudScore({
+        claimChargeCents: convertToCents(claim.claim_charge as number),
+        avgChargeCents: convertToCents(procedure?.avg_charge ?? 0),
+        stdChargeCents: convertToCents(procedure?.std_dev ?? 0),
         providerType: claim.provider_type ?? null,
         procedureCode: claim.procedure_code ?? null,
       });
-      const category =
-        resScore.score >= 76 ? "High" : resScore.score >= 26 ? "Medium" : "Low";
-      await claim.update({
-        fraud_score: resScore.score,
-        fraud_category: category,
-        fraud_reasons: JSON.stringify(resScore.reasons),
-      });
+
+      const fraudCategory = getFraudCategoryFromScore(fraudResult.score);
+
+      await claim.update(
+        {
+          fraud_score: fraudResult.score,
+          fraud_category: fraudCategory,
+          fraud_reasons: JSON.stringify(fraudResult.reasons),
+        },
+        { transaction }
+      );
     }
 
-    // Rebuild provider stats
-    await Provider.destroy({ where: {}, truncate: true });
+    // ✅ Rebuild provider stats
+    await Provider.destroy({ where: {}, truncate: true, transaction });
+
     const providerAgg = (await Claim.findAll({
       attributes: [
         "provider_id",
         "provider_type",
+        [Sequelize.fn("COUNT", Sequelize.col("id")), "total_claims"],
         [
-          Claim.sequelize!.fn("COUNT", Claim.sequelize!.col("id")),
-          "total_claims",
-        ],
-        [
-          Claim.sequelize!.fn("AVG", Claim.sequelize!.col("claim_charge")),
+          Sequelize.fn("AVG", Sequelize.col("claim_charge")),
           "avg_claim_charge",
         ],
       ],
@@ -176,19 +179,21 @@ export async function uploadClaims(req: Request, res: Response) {
       group: ["provider_id", "provider_type"],
       raw: true,
     })) as any[];
-    for (const p of providerAgg) {
-      await Provider.create({
-        provider_id: p.provider_id,
-        provider_type: p.provider_type,
-        total_claims: p.total_claims,
-        avg_claim_charge: p.avg_claim_charge,
-      });
-    }
 
+    await Provider.bulkCreate(providerAgg, { transaction });
+
+    await transaction.commit();
     fs.unlink(req.file.path, () => {});
-    res.status(200).json({ inserted, total: await Claim.count() });
+
+    res.status(200).json({
+      success: true,
+      message: "Claims uploaded and fraud scores recomputed successfully.",
+      inserted: claimsToInsert.length,
+      total: await Claim.count(),
+    });
   } catch (e: any) {
     console.error("Upload ingest failed:", e);
+    await transaction.rollback();
     res.status(500).json({ error: e.message || "Upload failed" });
   }
 }
