@@ -5,20 +5,13 @@ type Props = {
 
 export default function CsvPreviewTable({ headers, rows }: Props) {
   return (
-    <table style={{ borderCollapse: "collapse", minWidth: 640, width: "100%" }}>
+    <table className="w-full min-w-[640px] border-collapse">
       <thead>
         <tr>
           {headers.map((h, idx) => (
             <th
               key={idx}
-              style={{
-                textAlign: "left",
-                padding: "6px 8px",
-                borderBottom: "1px solid #eee",
-                background: "#fafafa",
-                position: "sticky",
-                top: 0,
-              }}
+              className="text-left px-2 py-1.5 border-b border-gray-200 bg-gray-50 sticky top-0"
             >
               {h}
             </th>
@@ -29,13 +22,7 @@ export default function CsvPreviewTable({ headers, rows }: Props) {
         {rows.map((row, rIdx) => (
           <tr key={rIdx}>
             {headers.map((_, cIdx) => (
-              <td
-                key={cIdx}
-                style={{
-                  padding: "6px 8px",
-                  borderBottom: "1px solid #f3f3f3",
-                }}
-              >
+              <td key={cIdx} className="px-2 py-1.5 border-b border-gray-100">
                 {row[cIdx] ?? ""}
               </td>
             ))}

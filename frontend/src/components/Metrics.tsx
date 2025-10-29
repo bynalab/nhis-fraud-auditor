@@ -12,21 +12,13 @@ export default function Metrics({
   flaggedPercent,
 }: Props) {
   const card = (label: string, value: string) => (
-    <div
-      style={{
-        border: "1px solid #eee",
-        borderRadius: 8,
-        padding: 16,
-        flex: 1,
-        background: "#fafafa",
-      }}
-    >
-      <div style={{ color: "#666", fontSize: 12 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 600 }}>{value}</div>
+    <div className="flex-1 rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <div className="text-gray-500 text-xs">{label}</div>
+      <div className="text-2xl font-semibold">{value}</div>
     </div>
   );
   return (
-    <div style={{ display: "flex", gap: 12 }}>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       {card("Total Claims", totalClaims.toLocaleString())}
       {card("Average Claim ($)", averageClaimCharge.toLocaleString())}
       {card(

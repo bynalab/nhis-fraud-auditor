@@ -19,24 +19,15 @@ export default function ScoreChart({ distribution }: Props) {
     { name: "High (76-100)", value: distribution.high },
   ];
   return (
-    <div
-      style={{
-        border: "1px solid #eee",
-        borderRadius: 8,
-        padding: 16,
-        background: "#fff",
-      }}
-    >
-      <div style={{ marginBottom: 8, fontWeight: 600 }}>
-        Fraud Score Distribution
-      </div>
+    <div className="rounded-lg border border-gray-200 p-4 bg-white">
+      <div className="mb-2 font-semibold">Fraud Score Distribution</div>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
           <YAxis allowDecimals={false} />
           <Tooltip />
-          <Bar dataKey="value" fill="#8884d8" />
+          <Bar dataKey="value" fill="#3b82f6" />
         </BarChart>
       </ResponsiveContainer>
     </div>

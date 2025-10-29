@@ -105,24 +105,38 @@ export default function Dashboard() {
       );
   }, []);
 
-  if (error) return <div style={{ color: "red" }}>Error: {error}</div>;
+  if (error) return <div className="text-red-600">Error: {error}</div>;
   if (!data) return <div>Loading...</div>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-2 items-center">
         <input
           ref={fileInputRef}
           type="file"
           accept=".csv,text/csv"
-          style={{ display: "none" }}
+          className="hidden"
           onChange={onFileChange}
         />
-        <button onClick={openFileDialog} disabled={uploading}>
+        <button
+          onClick={openFileDialog}
+          disabled={uploading}
+          className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50 cursor-pointer"
+        >
           {uploading ? "Uploading..." : "Upload Claims CSV"}
         </button>
-        <button onClick={handleReset}>Reset Data</button>
-        <button onClick={handleDrop}>Drop DB</button>
+        <button
+          onClick={handleReset}
+          className="px-3 py-1.5 rounded border border-gray-300 cursor-pointer"
+        >
+          Reset Data
+        </button>
+        <button
+          onClick={handleDrop}
+          className="px-3 py-1.5 rounded border border-gray-300 cursor-pointer"
+        >
+          Drop DB
+        </button>
       </div>
       {csvPreview && (
         <Modal

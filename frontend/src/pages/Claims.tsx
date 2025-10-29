@@ -55,7 +55,7 @@ export default function Claims() {
   );
 
   return (
-    <div>
+    <div className="flex flex-col gap-3">
       <SearchBar
         q={q}
         providerType={providerType}
@@ -65,13 +65,14 @@ export default function Claims() {
           setPage(1);
         }}
       />
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <div className="flex gap-2 mb-3">
         <button
           onClick={() => {
             setPage(1);
             fetchData();
           }}
           disabled={loading}
+          className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50 cursor-pointer"
         >
           Apply Filters
         </button>
@@ -83,55 +84,50 @@ export default function Claims() {
             setTimeout(fetchData, 0);
           }}
           disabled={loading}
+          className="px-3 py-1.5 rounded border border-gray-300 cursor-pointer"
         >
           Reset
         </button>
       </div>
 
-      {error && <div style={{ color: "red" }}>Error: {error}</div>}
+      {error && <div className="text-red-600">Error: {error}</div>}
       {loading && <div>Loading...</div>}
 
-      <div
-        style={{
-          border: "1px solid #eee",
-          borderRadius: 8,
-          overflow: "hidden",
-        }}
-      >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead style={{ background: "#fafafa" }}>
+      <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
+        <table className="w-full border-collapse">
+          <thead className="bg-gray-50">
             <tr>
-              <th style={{ textAlign: "left", padding: 8 }}>Claim ID</th>
-              <th style={{ textAlign: "left", padding: 8 }}>Procedure</th>
-              <th style={{ textAlign: "left", padding: 8 }}>Provider Type</th>
-              <th style={{ textAlign: "right", padding: 8 }}>Charge ($)</th>
-              <th style={{ textAlign: "center", padding: 8 }}>Fraud Score</th>
-              <th style={{ textAlign: "left", padding: 8 }}>Reasons</th>
-              <th style={{ textAlign: "left", padding: 8 }}>Service Date</th>
+              <th className="text-left p-2">Claim ID</th>
+              <th className="text-left p-2">Procedure</th>
+              <th className="text-left p-2">Provider Type</th>
+              <th className="text-right p-2">Charge ($)</th>
+              <th className="text-center p-2">Fraud Score</th>
+              <th className="text-left p-2">Reasons</th>
+              <th className="text-left p-2">Service Date</th>
             </tr>
           </thead>
           <tbody>
-            {resp?.items.map((item) => (
-              <tr key={item.claimId}>
-                <td style={{ padding: 8 }}>{item.claimId}</td>
-                <td style={{ padding: 8 }}>{item.procedureCode || "-"}</td>
-                <td style={{ padding: 8 }}>{item.providerType || "-"}</td>
-                <td style={{ padding: 8, textAlign: "right" }}>
+            {resp?.items.map((item, idx) => (
+              <tr
+                key={item.claimId}
+                className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+              >
+                <td className="p-2">{item.claimId}</td>
+                <td className="p-2">{item.procedureCode || "-"}</td>
+                <td className="p-2">{item.providerType || "-"}</td>
+                <td className="p-2 text-right">
                   {item.claimCharge.toLocaleString()}
                 </td>
-                <td style={{ padding: 8, textAlign: "center" }}>
+                <td className="p-2 text-center">
                   <ScoreBadge score={item.score} />
                 </td>
-                <td style={{ padding: 8 }}>{item.reasons.join(", ")}</td>
-                <td style={{ padding: 8 }}>{item.serviceDate || "-"}</td>
+                <td className="p-2">{item.reasons.join(", ")}</td>
+                <td className="p-2">{item.serviceDate || "-"}</td>
               </tr>
             ))}
             {!resp?.items?.length && (
               <tr>
-                <td
-                  colSpan={7}
-                  style={{ padding: 16, textAlign: "center", color: "#666" }}
-                >
+                <td colSpan={7} className="p-4 text-center text-gray-600">
                   No claims found
                 </td>
               </tr>
@@ -140,12 +136,11 @@ export default function Claims() {
         </table>
       </div>
 
-      <div
-        style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}
-      >
+      <div className="flex items-center gap-2 mt-3">
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page <= 1 || loading}
+          className="px-3 py-1.5 rounded border border-gray-300 disabled:opacity-50 cursor-pointer"
         >
           Prev
         </button>
@@ -155,6 +150,7 @@ export default function Claims() {
         <button
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page >= totalPages || loading}
+          className="px-3 py-1.5 rounded border border-gray-300 disabled:opacity-50 cursor-pointer"
         >
           Next
         </button>

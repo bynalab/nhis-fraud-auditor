@@ -36,16 +36,7 @@ export default function Modal({
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: 16,
-      }}
+      className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4"
       role="dialog"
       aria-modal="true"
       onClick={(e) => {
@@ -53,36 +44,32 @@ export default function Modal({
       }}
     >
       <div
-        style={{
-          background: "#fff",
-          borderRadius: 10,
-          width: `min(100%, ${widthPx}px)`,
-          maxHeight: "80vh",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-          display: "flex",
-          flexDirection: "column",
-        }}
+        className="bg-white rounded-xl shadow-2xl flex flex-col max-h-[80vh] w-full"
+        style={{ width: `min(100%, ${widthPx}px)` }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "12px 16px",
-            borderBottom: "1px solid #eee",
-          }}
-        >
-          <div style={{ fontWeight: 600 }}>{title}</div>
-          <div style={{ display: "flex", gap: 8 }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <div className="font-semibold">{title}</div>
+          <div className="flex gap-2">
             {onConfirm && (
-              <button onClick={onConfirm} disabled={confirmDisabled}>
+              <button
+                onClick={onConfirm}
+                disabled={confirmDisabled}
+                className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50 cursor-pointer"
+              >
                 {confirmLabel}
               </button>
             )}
-            {onCancel && <button onClick={onCancel}>{cancelLabel}</button>}
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="px-3 py-1.5 rounded border border-gray-300 cursor-pointer"
+              >
+                {cancelLabel}
+              </button>
+            )}
           </div>
         </div>
-        <div style={{ padding: 16, overflow: "auto" }}>{children}</div>
+        <div className="p-4 overflow-auto">{children}</div>
       </div>
     </div>
   );
