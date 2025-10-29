@@ -11,7 +11,7 @@ export default function CsvPreviewTable({ headers, rows }: Props) {
           {headers.map((h, idx) => (
             <th
               key={idx}
-              className="text-left px-2 py-1.5 border-b border-gray-200 bg-gray-50 sticky top-0"
+              className="text-left px-2 py-1.5 border-b border-gray-200 bg-gray-50 sticky top-0 text-black"
             >
               {h}
             </th>
