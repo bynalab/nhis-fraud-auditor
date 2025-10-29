@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import axios, { AxiosResponse } from "axios";
 import { api } from "../services/api";
+import { parseCsvPreview, CsvPreview } from "../services/csv";
 import Metrics from "../components/Metrics";
 import ScoreChart from "../components/ScoreChart";
+import Modal from "../components/Modal";
+import CsvPreviewTable from "../components/CsvPreviewTable";
 
 type MetricsResp = {
   metrics: {
@@ -18,7 +21,80 @@ export default function Dashboard() {
   const [data, setData] = useState<MetricsResp | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<CsvPreview | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const openFileDialog = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const onFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const preview = parseCsvPreview(text, 25);
+        setCsvPreview(preview);
+        setSelectedFile(file);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to parse CSV");
+        setCsvPreview(null);
+        setSelectedFile(null);
+      }
+    },
+    []
+  );
+
+  const handleConfirmUpload = useCallback(async () => {
+    if (!selectedFile) return;
+    setUploading(true);
+    try {
+      await api.uploadClaims(selectedFile);
+      const refreshed = await axios.get<MetricsResp>("/api/metrics");
+      setData(refreshed.data);
+      setCsvPreview(null);
+      setSelectedFile(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [selectedFile]);
+
+  const handleCancelPreview = useCallback(() => {
+    setCsvPreview(null);
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  const handleReset = useCallback(async () => {
+    const ok = window.confirm("Reset data? This will truncate all tables.");
+    if (!ok) return;
+    try {
+      await api.resetData();
+      const refreshed = await axios.get<MetricsResp>("/api/metrics");
+      setData(refreshed.data);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Reset failed");
+    }
+  }, []);
+
+  const handleDrop = useCallback(async () => {
+    const ok = window.confirm(
+      "Drop database? This will drop and re-create all tables."
+    );
+    if (!ok) return;
+    try {
+      await api.dropDatabase();
+      const refreshed = await axios.get<MetricsResp>("/api/metrics");
+      setData(refreshed.data);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Drop failed");
+    }
+  }, []);
 
   useEffect(() => {
     axios
@@ -40,63 +116,36 @@ export default function Dashboard() {
           type="file"
           accept=".csv,text/csv"
           style={{ display: "none" }}
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            setUploading(true);
-            try {
-              await api.uploadClaims(file);
-              const refreshed = await axios.get<MetricsResp>("/api/metrics");
-              setData(refreshed.data);
-            } catch (e: unknown) {
-              setError(e instanceof Error ? e.message : "Upload failed");
-            } finally {
-              setUploading(false);
-              if (fileInputRef.current) fileInputRef.current.value = "";
-            }
-          }}
+          onChange={onFileChange}
         />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-        >
+        <button onClick={openFileDialog} disabled={uploading}>
           {uploading ? "Uploading..." : "Upload Claims CSV"}
         </button>
-        <button
-          onClick={async () => {
-            const ok = window.confirm(
-              "Reset data? This will truncate all tables."
-            );
-            if (!ok) return;
-            try {
-              await api.resetData();
-              const refreshed = await axios.get<MetricsResp>("/api/metrics");
-              setData(refreshed.data);
-            } catch (e: unknown) {
-              setError(e instanceof Error ? e.message : "Reset failed");
-            }
-          }}
-        >
-          Reset Data
-        </button>
-        <button
-          onClick={async () => {
-            const ok = window.confirm(
-              "Drop database? This will drop and re-create all tables."
-            );
-            if (!ok) return;
-            try {
-              await api.dropDatabase();
-              const refreshed = await axios.get<MetricsResp>("/api/metrics");
-              setData(refreshed.data);
-            } catch (e: unknown) {
-              setError(e instanceof Error ? e.message : "Drop failed");
-            }
-          }}
-        >
-          Drop DB
-        </button>
+        <button onClick={handleReset}>Reset Data</button>
+        <button onClick={handleDrop}>Drop DB</button>
       </div>
+      {csvPreview && (
+        <Modal
+          isOpen={true}
+          title={
+            <>
+              CSV Preview{" "}
+              <span style={{ color: "#666", fontWeight: 400 }}>
+                (showing up to 25 rows, total ~{csvPreview.totalRowsEstimated})
+              </span>
+            </>
+          }
+          onConfirm={handleConfirmUpload}
+          onCancel={handleCancelPreview}
+          confirmLabel={uploading ? "Uploading..." : "Confirm Upload"}
+          confirmDisabled={uploading}
+        >
+          <CsvPreviewTable
+            headers={csvPreview.headers}
+            rows={csvPreview.rows}
+          />
+        </Modal>
+      )}
       <Metrics {...data.metrics} />
       <ScoreChart distribution={data.distribution} />
     </div>
