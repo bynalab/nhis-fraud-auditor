@@ -93,17 +93,17 @@ export default function Claims() {
       {error && <div className="text-red-600">Error: {error}</div>}
       {loading && <div>Loading...</div>}
 
-      <div className="rounded-lg border border-gray-200 overflow-hidden bg-white">
-        <table className="w-full border-collapse">
+      <div className="rounded-lg border border-gray-200 overflow-x-auto bg-white">
+        <table className="w-full min-w-[720px] border-collapse">
           <thead className="bg-gray-50">
             <tr>
-              <th className="text-left p-2">Claim ID</th>
-              <th className="text-left p-2">Procedure</th>
-              <th className="text-left p-2">Provider Type</th>
-              <th className="text-right p-2">Charge ($)</th>
-              <th className="text-center p-2">Fraud Score</th>
-              <th className="text-left p-2">Reasons</th>
-              <th className="text-left p-2">Service Date</th>
+              <th className="text-left p-2 whitespace-nowrap">Claim ID</th>
+              <th className="text-left p-2 whitespace-nowrap">Procedure</th>
+              <th className="text-left p-2 whitespace-nowrap">Provider Type</th>
+              <th className="text-right p-2 whitespace-nowrap">Charge ($)</th>
+              <th className="text-center p-2 whitespace-nowrap">Fraud Score</th>
+              <th className="text-left p-2 whitespace-nowrap">Reasons</th>
+              <th className="text-left p-2 whitespace-nowrap">Service Date</th>
             </tr>
           </thead>
           <tbody>
@@ -112,17 +112,29 @@ export default function Claims() {
                 key={item.claimId}
                 className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
               >
-                <td className="p-2">{item.claimId}</td>
-                <td className="p-2">{item.procedureCode || "-"}</td>
-                <td className="p-2">{item.providerType || "-"}</td>
-                <td className="p-2 text-right">
+                <td className="p-2 whitespace-nowrap">{item.claimId}</td>
+                <td className="p-2 whitespace-nowrap">
+                  {item.procedureCode || "-"}
+                </td>
+                <td className="p-2 whitespace-nowrap">
+                  {item.providerType || "-"}
+                </td>
+                <td className="p-2 text-right whitespace-nowrap">
                   {item.claimCharge.toLocaleString()}
                 </td>
-                <td className="p-2 text-center">
+                <td className="p-2 text-center whitespace-nowrap">
                   <ScoreBadge score={item.score} />
                 </td>
-                <td className="p-2">{item.reasons.join(", ")}</td>
-                <td className="p-2">{item.serviceDate || "-"}</td>
+                <td className="p-2 whitespace-nowrap">
+                  <div className="flex flex-col gap-0.5">
+                    {item.reasons.map((reason, i) => (
+                      <span key={i}>{reason}</span>
+                    ))}
+                  </div>
+                </td>
+                <td className="p-2 whitespace-nowrap">
+                  {item.serviceDate || "-"}
+                </td>
               </tr>
             ))}
             {!resp?.items?.length && (
