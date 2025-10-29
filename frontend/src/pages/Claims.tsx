@@ -81,9 +81,9 @@ export default function Claims() {
       )}
       {loading && <div>Loading...</div>}
 
-      <div className="rounded-lg border border-gray-200 overflow-x-auto bg-white">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-x-auto bg-white dark:bg-gray-800">
         <table className="w-full min-w-[720px] border-collapse">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 dark:bg-gray-800/50">
             <tr>
               <th className="text-left p-2 whitespace-nowrap">Claim ID</th>
               <th className="text-left p-2 whitespace-nowrap">Procedure</th>
@@ -98,7 +98,11 @@ export default function Claims() {
             {resp?.items.map((item: Claim, idx: number) => (
               <tr
                 key={item.claimId}
-                className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                className={
+                  idx % 2 === 0
+                    ? "bg-white dark:bg-gray-800"
+                    : "bg-gray-50 dark:bg-gray-800/60"
+                }
               >
                 <td className="p-2 whitespace-nowrap">{item.claimId}</td>
                 <td className="p-2 whitespace-nowrap">

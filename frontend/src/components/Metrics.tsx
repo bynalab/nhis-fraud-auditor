@@ -12,8 +12,8 @@ export default function Metrics({
   flaggedPercent,
 }: Props) {
   const card = (label: string, value: string) => (
-    <div className="flex-1 rounded-lg border border-gray-200 bg-gray-50 p-4">
-      <div className="text-gray-500 text-xs">{label}</div>
+    <div className="flex-1 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 p-4">
+      <div className="text-gray-500 dark:text-gray-400 text-xs">{label}</div>
       <div className="text-2xl font-semibold">{value}</div>
     </div>
   );

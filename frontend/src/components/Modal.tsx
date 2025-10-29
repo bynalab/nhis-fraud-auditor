@@ -44,10 +44,10 @@ export default function Modal({
       }}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl flex flex-col max-h-[80vh] w-full"
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl flex flex-col max-h-[80vh] w-full border border-gray-200 dark:border-gray-700"
         style={{ width: `min(100%, ${widthPx}px)` }}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
           <div className="font-semibold">{title}</div>
           <div className="flex gap-2">
             {onConfirm && (

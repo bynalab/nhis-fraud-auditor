@@ -1,1 +1,4 @@
 @import "tailwindcss";
+
+/* Use class-based dark mode by mapping the dark variant to .dark on :root */
+@custom-variant dark (&:where(.dark, .dark *));
