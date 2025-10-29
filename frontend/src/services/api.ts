@@ -1,6 +1,5 @@
-import axios, { AxiosResponse } from "axios";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+import { AxiosResponse } from "axios";
+import http from "./http";
 
 export interface Claim {
   claimId: string;
@@ -47,15 +46,15 @@ export const api = {
     if (params.providerType)
       queryParams.set("providerType", params.providerType);
 
-    const response: AxiosResponse<ClaimsResponse> = await axios.get(
-      `${API_BASE_URL}/api/claims?${queryParams.toString()}`
+    const response: AxiosResponse<ClaimsResponse> = await http.get(
+      `/api/claims?${queryParams.toString()}`
     );
     return response.data;
   },
 
   async getMetrics(): Promise<MetricsResponse> {
-    const response: AxiosResponse<MetricsResponse> = await axios.get(
-      `${API_BASE_URL}/api/metrics`
+    const response: AxiosResponse<MetricsResponse> = await http.get(
+      `/api/metrics`
     );
     return response.data;
   },
@@ -64,7 +63,7 @@ export const api = {
     const form = new FormData();
     form.append("file", file);
     const response: AxiosResponse<{ inserted: number; total: number }> =
-      await axios.post(`${API_BASE_URL}/api/claims/upload`, form, {
+      await http.post(`/api/claims/upload`, form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
     return response.data;
@@ -72,13 +71,13 @@ export const api = {
 
   async resetData(): Promise<{ ok: boolean; message: string }> {
     const response: AxiosResponse<{ ok: boolean; message: string }> =
-      await axios.post(`http://localhost:3000/api/admin/reset`);
+      await http.post(`/api/admin/reset`);
     return response.data;
   },
 
   async dropDatabase(): Promise<{ ok: boolean; message: string }> {
     const response: AxiosResponse<{ ok: boolean; message: string }> =
-      await axios.post(`${API_BASE_URL}/api/admin/drop`);
+      await http.post(`/api/admin/drop`);
     return response.data;
   },
 };

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import axios, { AxiosResponse } from "axios";
+import { useRef, useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../services/api";
 import { parseCsvPreview, CsvPreview } from "../services/csv";
 import Metrics from "../components/Metrics";
@@ -18,12 +18,19 @@ type MetricsResp = {
 };
 
 export default function Dashboard() {
-  const [data, setData] = useState<MetricsResp | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [csvPreview, setCsvPreview] = useState<CsvPreview | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const metricsQuery = useQuery({
+    queryKey: ["metrics"],
+    queryFn: api.getMetrics,
+  });
+  const data = metricsQuery.data as MetricsResp | undefined;
+  const error = metricsQuery.error as unknown;
+  const isLoading = metricsQuery.isLoading as boolean;
 
   const openFileDialog = useCallback(() => {
     fileInputRef.current?.click();
@@ -39,7 +46,7 @@ export default function Dashboard() {
         setCsvPreview(preview);
         setSelectedFile(file);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to parse CSV");
+        console.error(err);
         setCsvPreview(null);
         setSelectedFile(null);
       }
@@ -52,17 +59,16 @@ export default function Dashboard() {
     setUploading(true);
     try {
       await api.uploadClaims(selectedFile);
-      const refreshed = await axios.get<MetricsResp>("/api/metrics");
-      setData(refreshed.data);
+      await queryClient.invalidateQueries({ queryKey: ["metrics"] });
       setCsvPreview(null);
       setSelectedFile(null);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      console.error(e);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }, [selectedFile]);
+  }, [selectedFile, queryClient]);
 
   const handleCancelPreview = useCallback(() => {
     setCsvPreview(null);
@@ -75,12 +81,11 @@ export default function Dashboard() {
     if (!ok) return;
     try {
       await api.resetData();
-      const refreshed = await axios.get<MetricsResp>("/api/metrics");
-      setData(refreshed.data);
+      await queryClient.invalidateQueries({ queryKey: ["metrics"] });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Reset failed");
+      console.error(e);
     }
-  }, []);
+  }, [queryClient]);
 
   const handleDrop = useCallback(async () => {
     const ok = window.confirm(
@@ -89,24 +94,15 @@ export default function Dashboard() {
     if (!ok) return;
     try {
       await api.dropDatabase();
-      const refreshed = await axios.get<MetricsResp>("/api/metrics");
-      setData(refreshed.data);
+      await queryClient.invalidateQueries({ queryKey: ["metrics"] });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Drop failed");
+      console.error(e);
     }
-  }, []);
+  }, [queryClient]);
 
-  useEffect(() => {
-    axios
-      .get<MetricsResp>("/api/metrics")
-      .then((response: AxiosResponse<MetricsResp>) => setData(response.data))
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : "Unknown error")
-      );
-  }, []);
-
-  if (error) return <div className="text-red-600">Error: {error}</div>;
-  if (!data) return <div>Loading...</div>;
+  if (error instanceof Error)
+    return <div className="text-red-600">Error: {error.message}</div>;
+  if (isLoading || !data) return <div>Loading...</div>;
 
   return (
     <div className="flex flex-col gap-4">

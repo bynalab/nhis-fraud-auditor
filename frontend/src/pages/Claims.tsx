@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import axios, { AxiosResponse } from "axios";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../services/api";
 import SearchBar from "../components/SearchBar";
 import ScoreBadge from "../components/ScoreBadge";
 
@@ -24,30 +25,15 @@ export default function Claims() {
   const [q, setQ] = useState("");
   const [providerType, setProviderType] = useState("");
   const [page, setPage] = useState(1);
-  const [resp, setResp] = useState<Resp | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchData = () => {
-    setLoading(true);
-    const params = new URLSearchParams({
-      page: String(page),
-      pageSize: String(20),
-    });
-    if (q) params.set("q", q);
-    if (providerType) params.set("providerType", providerType);
-    axios
-      .get<Resp>(`/api/claims?${params.toString()}`)
-      .then((res: AxiosResponse<Resp>) => setResp(res.data))
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : "Unknown error")
-      )
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [page]);
+  const claimsQuery = useQuery({
+    queryKey: ["claims", { page, pageSize: 20, q, providerType }],
+    queryFn: () => api.getClaims({ page, pageSize: 20, q, providerType }),
+    keepPreviousData: true,
+  });
+  const resp = claimsQuery.data as Resp | undefined;
+  const loading = claimsQuery.isLoading as boolean;
+  const error = claimsQuery.error as unknown;
+  const refetch = claimsQuery.refetch.bind(claimsQuery);
 
   const totalPages = useMemo(
     () => (resp ? Math.max(1, Math.ceil(resp.total / resp.pageSize)) : 1),
@@ -69,7 +55,7 @@ export default function Claims() {
         <button
           onClick={() => {
             setPage(1);
-            fetchData();
+            refetch();
           }}
           disabled={loading}
           className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50 cursor-pointer"
@@ -81,7 +67,7 @@ export default function Claims() {
             setQ("");
             setProviderType("");
             setPage(1);
-            setTimeout(fetchData, 0);
+            setTimeout(() => refetch(), 0);
           }}
           disabled={loading}
           className="px-3 py-1.5 rounded border border-gray-300 cursor-pointer"
@@ -90,7 +76,9 @@ export default function Claims() {
         </button>
       </div>
 
-      {error && <div className="text-red-600">Error: {error}</div>}
+      {error instanceof Error && (
+        <div className="text-red-600">Error: {error.message}</div>
+      )}
       {loading && <div>Loading...</div>}
 
       <div className="rounded-lg border border-gray-200 overflow-x-auto bg-white">
@@ -107,7 +95,7 @@ export default function Claims() {
             </tr>
           </thead>
           <tbody>
-            {resp?.items.map((item, idx) => (
+            {resp?.items.map((item: Claim, idx: number) => (
               <tr
                 key={item.claimId}
                 className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
@@ -127,7 +115,7 @@ export default function Claims() {
                 </td>
                 <td className="p-2 whitespace-nowrap">
                   <div className="flex flex-col gap-0.5">
-                    {item.reasons.map((reason, i) => (
+                    {item.reasons.map((reason: string, i: number) => (
                       <span key={i}>{reason}</span>
                     ))}
                   </div>
