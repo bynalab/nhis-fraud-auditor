@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { Op } from "sequelize";
 import { Claim } from "../db";
+import { FRAUD_HIGH_THRESHOLD } from "../utils/constant";
 
 export async function getMetrics(req: Request, res: Response) {
   try {
@@ -18,7 +19,7 @@ export async function getMetrics(req: Request, res: Response) {
 
     const flagged = await Claim.count({
       where: {
-        fraud_score: { [Op.gt]: 75 },
+        fraud_score: { [Op.gt]: FRAUD_HIGH_THRESHOLD },
       },
     });
 

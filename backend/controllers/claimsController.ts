@@ -107,6 +107,7 @@ export async function uploadClaims(req: Request, res: Response) {
       where: { procedure_code: { [Op.ne]: null } },
       group: ["procedure_code"],
       raw: true,
+      transaction,
     })) as any[];
 
     for (const stat of statsData) {
@@ -114,6 +115,7 @@ export async function uploadClaims(req: Request, res: Response) {
         where: { procedure_code: stat.procedure_code },
         attributes: ["claim_charge"],
         raw: true,
+        transaction,
       })) as any[];
 
       const charges = procedureClaims.map((c) => c.claim_charge as number);
@@ -178,6 +180,7 @@ export async function uploadClaims(req: Request, res: Response) {
       where: { provider_id: { [Op.ne]: null } },
       group: ["provider_id", "provider_type"],
       raw: true,
+      transaction,
     })) as any[];
 
     await Provider.bulkCreate(providerAgg, { transaction });

@@ -1,6 +1,8 @@
 // Simple, explainable fraud likelihood heuristic producing an integer [0, 100]
 // Inputs are in cents to avoid floating point issues
 
+import { FRAUD_HIGH_THRESHOLD, FRAUD_MEDIUM_THRESHOLD } from "./constant";
+
 export function computeFraudScore({
   claimChargeCents,
   avgChargeCents,
@@ -64,6 +66,10 @@ export function calculateVariance(charges: number[], avg: number): number {
   );
 }
 
-export function getFraudCategoryFromScore(score: number) {
-  return score >= 75 ? "High" : score >= 26 ? "Medium" : "Low";
+export function getFraudCategoryFromScore(
+  score: number
+): "Low" | "Medium" | "High" {
+  if (score >= FRAUD_HIGH_THRESHOLD) return "High";
+  if (score >= FRAUD_MEDIUM_THRESHOLD) return "Medium";
+  return "Low";
 }
