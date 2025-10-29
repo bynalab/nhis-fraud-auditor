@@ -47,9 +47,6 @@ export default function App() {
         </div>
       </header>
       <Outlet />
-      <footer className="mt-8 text-gray-600 dark:text-gray-400 text-xs">
-        Built for NHIS claims auditing. Demo only.
-      </footer>
     </div>
   );
 }
