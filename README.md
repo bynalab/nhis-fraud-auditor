@@ -166,6 +166,8 @@ Request flow: UI → `/api/*` → Express routes → Controllers → Sequelize m
 We used the standard deviation approach because it measures how far a claim deviates from what’s statistically normal for that procedure.
 If a claim’s cost is far above the average range — for example, more than 2 or 3 standard deviations higher — it’s likely fraudulent or misreported.
 
+Explanation: https://youtu.be/MRqtXL2WX2M?si=YavUALCQZpxLFti2
+
 The fraud score ranges from 0 to 100 and is the sum of weighted signals (capped at 100):
 
 - Overcharge ratio: adds 20 if charge > 1.15× average; adds 40 if > 1.5×.
