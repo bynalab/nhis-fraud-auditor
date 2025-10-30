@@ -129,33 +129,6 @@ Claim.init(
   }
 );
 
-// Provider Model
-export class Provider extends Model {
-  declare id: number;
-  declare provider_id: string;
-  declare provider_type: string | null;
-  declare total_claims: number;
-  declare avg_claim_charge: number;
-  declare last_updated: Date;
-}
-
-Provider.init(
-  {
-    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-    provider_id: { type: DataTypes.TEXT, unique: true },
-    provider_type: { type: DataTypes.TEXT, allowNull: true },
-    total_claims: { type: DataTypes.INTEGER, defaultValue: 0 },
-    avg_claim_charge: { type: DataTypes.REAL, defaultValue: 0 },
-    last_updated: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
-  },
-  {
-    sequelize,
-    modelName: "Provider",
-    tableName: "providers",
-    timestamps: false,
-  }
-);
-
 // Procedure Model
 export class Procedure extends Model {
   declare id: number;

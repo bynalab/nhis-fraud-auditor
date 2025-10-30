@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
-import { Op, Sequelize, where } from "sequelize";
+import { Op, Sequelize } from "sequelize";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { parse } from "csv-parse/sync";
-import { Claim, Procedure, Provider, sequelize } from "../db";
+import { Claim, Procedure, sequelize } from "../db";
 import {
   computeFraudScore,
   calculateStandardDeviation,
@@ -22,7 +22,6 @@ export async function listClaims(req: Request, res: Response) {
       page = "1",
       pageSize = "20",
       q = "",
-      providerType = "",
     } = req.query as Record<string, string>;
 
     const p = Math.max(1, parseInt(page, 10) || 1);
@@ -77,74 +76,69 @@ export async function uploadClaims(req: Request, res: Response) {
   const transaction = await sequelize.transaction();
 
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
+    // 1️⃣ Parse uploaded CSV
     const csvContent = fs.readFileSync(req.file.path, "utf8");
     const records = parse(csvContent, {
       columns: true,
       skip_empty_lines: true,
     }) as any[];
 
-    // ✅ Normalize & prepare claims
-    const claimsToInsert = records.map((r) => {
-      const treatment = r["Treatment"] || null;
-      return {
-        claim_id: r["Claim ID"] || r["Patient ID"],
-        patient_id: r["Patient ID"] || null,
-        age: r["Age"] ? Number(r["Age"]) : null,
-        gender: r["Gender"] || null,
-        date_admitted: r["Date Admitted"] || null,
-        date_discharged: r["Date Discharged"] || null,
-        diagnosis: r["Diagnosis"] || null,
-        treatment: treatment,
-        claim_charge: Number(r["Amount Billed"] || r["Claim Charge"] || "0"),
-        fraud_type: r["Fraud Type"] || null,
-        // Legacy fields for backward compatibility with fraud detection
-        procedure_code: treatment, // map treatment to procedure_code
-        provider_id: r["Provider ID"] || null,
-        provider_type: r["Provider Type"] || null,
-      };
-    });
+    // 2️⃣ Normalize and prepare claims
+    const claimsToInsert = records.map((r) => ({
+      claim_id: r["Claim ID"] || r["Patient ID"],
+      patient_id: r["Patient ID"],
+      age: Number(r["Age"]) || null,
+      gender: r["Gender"] || null,
+      date_admitted: r["Date Admitted"] || null,
+      date_discharged: r["Date Discharged"] || null,
+      diagnosis: r["Diagnosis"] || null,
+      treatment: r["Treatment"] || null, // used as procedure code
+      claim_charge: Number(r["Amount Billed"]) || 0,
+      fraud_type: r["Fraud Type"] || null,
+    }));
 
-    // ✅ Bulk insert with duplicate ignoring
     await Claim.bulkCreate(claimsToInsert, {
       ignoreDuplicates: true,
       transaction,
     });
 
-    // ✅ Rebuild procedure stats
-    await Procedure.destroy({ where: {}, truncate: true, transaction });
-
+    // 3️⃣ Compute average & standard deviation for each treatment (procedure)
     const statsData = (await Claim.findAll({
       attributes: [
-        "procedure_code",
+        "treatment",
         [Sequelize.fn("AVG", Sequelize.col("claim_charge")), "avg_charge"],
         [Sequelize.fn("COUNT", Sequelize.col("id")), "total_claims"],
       ],
-      where: { procedure_code: { [Op.ne]: null } },
-      group: ["procedure_code"],
+      where: { treatment: { [Op.ne]: null } },
+      group: ["treatment"],
       raw: true,
       transaction,
     })) as any[];
 
+    await Procedure.destroy({ where: {}, truncate: true, transaction });
+
     for (const stat of statsData) {
-      const procedureClaims = (await Claim.findAll({
-        where: { procedure_code: stat.procedure_code },
-        attributes: ["claim_charge"],
-        raw: true,
-        transaction,
-      })) as any[];
+      const charges = (
+        await Claim.findAll({
+          where: { treatment: stat.treatment },
+          attributes: ["claim_charge"],
+          raw: true,
+          transaction,
+        })
+      ).map((c) => c.claim_charge as number);
 
-      const charges = procedureClaims.map((c) => c.claim_charge as number);
+      const avg = stat.avg_charge as number;
+      const stdDev = calculateStandardDeviation(charges, avg);
 
-      const averageCharge = stat.avg_charge as number;
-      const stdDev = calculateStandardDeviation(charges, averageCharge);
+      // We could save this in memory but we might want to do some visualization
+      // e.g If you want to show average and deviation per treatment on a dashboard or analytics page
+
       await Procedure.create(
         {
-          procedure_code: stat.procedure_code,
-          avg_charge: averageCharge,
+          procedure_code: stat.treatment,
+          avg_charge: avg,
           std_dev: stdDev,
           total_claims: stat.total_claims,
         },
@@ -152,69 +146,44 @@ export async function uploadClaims(req: Request, res: Response) {
       );
     }
 
-    // ✅ Compute fraud scores
+    // 4️⃣ Preload procedures once into memory (avoid repeated DB lookups)
+    const procedures = await Procedure.findAll({ raw: true, transaction });
+    const procMap = new Map(procedures.map((p) => [p.procedure_code, p]));
+
+    // 5️⃣ Compute fraud scores for all claims
     const allClaims = await Claim.findAll({ transaction });
     for (const claim of allClaims) {
-      let procedure: Procedure | null = null;
-      if (claim.procedure_code) {
-        procedure = await Procedure.findOne({
-          where: { procedure_code: claim.procedure_code },
-          transaction,
-        });
-      }
-
+      const proc = procMap.get(claim.treatment ?? "");
       const fraudResult = computeFraudScore({
-        claimChargeCents: convertToCents(claim.claim_charge as number),
-        avgChargeCents: convertToCents(procedure?.avg_charge ?? 0),
-        stdChargeCents: convertToCents(procedure?.std_dev ?? 0),
-        providerType: claim.provider_type ?? null,
-        procedureCode: claim.procedure_code ?? null,
+        claimChargeCents: convertToCents(claim.claim_charge || 0),
+        avgChargeCents: convertToCents(proc?.avg_charge ?? 0),
+        stdChargeCents: convertToCents(proc?.std_dev ?? 0),
+        providerType: null,
+        procedureCode: claim.treatment ?? null,
       });
 
-      const fraudCategory = getFraudCategoryFromScore(fraudResult.score);
+      const category = getFraudCategoryFromScore(fraudResult.score);
 
       await claim.update(
         {
           fraud_score: fraudResult.score,
-          fraud_category: fraudCategory,
+          fraud_category: category,
           fraud_reasons: JSON.stringify(fraudResult.reasons),
         },
         { transaction }
       );
     }
 
-    // ✅ Rebuild provider stats
-    await Provider.destroy({ where: {}, truncate: true, transaction });
-
-    const providerAgg = (await Claim.findAll({
-      attributes: [
-        "provider_id",
-        "provider_type",
-        [Sequelize.fn("COUNT", Sequelize.col("id")), "total_claims"],
-        [
-          Sequelize.fn("AVG", Sequelize.col("claim_charge")),
-          "avg_claim_charge",
-        ],
-      ],
-      where: { provider_id: { [Op.ne]: null } },
-      group: ["provider_id", "provider_type"],
-      raw: true,
-      transaction,
-    })) as any[];
-
-    await Provider.bulkCreate(providerAgg, { transaction });
-
     await transaction.commit();
     fs.unlink(req.file.path, () => {});
 
     res.status(200).json({
       success: true,
-      message: "Claims uploaded and fraud scores recomputed successfully.",
-      inserted: claimsToInsert.length,
-      total: await Claim.count(),
+      message: "Claims uploaded and fraud scores computed successfully.",
+      total_claims: await Claim.count(),
     });
   } catch (e: any) {
-    console.error("Upload ingest failed:", e);
+    console.error("Upload failed:", e);
     await transaction.rollback();
     res.status(500).json({ error: e.message || "Upload failed" });
   }
