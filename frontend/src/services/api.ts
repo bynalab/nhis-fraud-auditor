@@ -2,13 +2,19 @@ import { AxiosResponse } from "axios";
 import http from "./http";
 
 export interface Claim {
-  claimId: string;
-  providerType: string | null;
-  procedureCode: string | null;
-  claimCharge: number;
-  score: number;
-  reasons: string[];
-  serviceDate: string | null;
+  claim_id: string;
+  patient_id: string | null;
+  age: number | null;
+  gender: string | null;
+  date_admitted: string | null;
+  date_discharged: string | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  claim_charge: number;
+  fraud_type: string | null;
+  fraud_score: number;
+  fraud_category: string | null;
+  fraud_reasons: string[];
 }
 
 export interface ClaimsResponse {

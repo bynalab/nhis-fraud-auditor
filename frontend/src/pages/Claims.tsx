@@ -1,17 +1,24 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../services/api";
 import SearchBar from "../components/SearchBar";
+import OverlayLoader from "../components/OverlayLoader";
 import ScoreBadge from "../components/ScoreBadge";
 
 type Claim = {
-  claimId: string;
-  providerType: string | null;
-  procedureCode: string | null;
-  claimCharge: number;
-  score: number;
-  reasons: string[];
-  serviceDate: string | null;
+  claim_id: string;
+  patient_id: string | null;
+  age: number | null;
+  gender: string | null;
+  date_admitted: string | null;
+  date_discharged: string | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  claim_charge: number;
+  fraud_type: string | null;
+  fraud_score: number;
+  fraud_category: string | null;
+  fraud_reasons: string[];
 };
 
 type Resp = {
@@ -25,9 +32,37 @@ export default function Claims() {
   const [q, setQ] = useState("");
   const [providerType, setProviderType] = useState("");
   const [page, setPage] = useState(1);
+  // Debounced search state
+  const [debouncedQ, setDebouncedQ] = useState(q);
+  const [debouncedProviderType, setDebouncedProviderType] =
+    useState(providerType);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQ(q);
+      setDebouncedProviderType(providerType);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [q, providerType]);
+
   const claimsQuery = useQuery({
-    queryKey: ["claims", { page, pageSize: 20, q, providerType }],
-    queryFn: () => api.getClaims({ page, pageSize: 20, q, providerType }),
+    queryKey: [
+      "claims",
+      {
+        page,
+        pageSize: 20,
+        q: debouncedQ,
+        providerType: debouncedProviderType,
+      },
+    ],
+    queryFn: () =>
+      api.getClaims({
+        page,
+        pageSize: 20,
+        q: debouncedQ,
+        providerType: debouncedProviderType,
+      }),
     keepPreviousData: true,
   });
   const resp = claimsQuery.data as Resp | undefined;
@@ -48,7 +83,7 @@ export default function Claims() {
         onChange={({ q, providerType }) => {
           setQ(q);
           setProviderType(providerType);
-          setPage(1);
+          // Debounce resets search but page reset is triggered in debounce effect
         }}
       />
       <div className="flex gap-2 mb-3">
@@ -82,56 +117,78 @@ export default function Claims() {
       {loading && <div>Loading...</div>}
 
       <div className="rounded-lg border border-gray-200 dark:border-gray-800 overflow-x-auto bg-white dark:bg-gray-800">
-        <table className="w-full min-w-[720px] border-collapse">
+        <table className="w-full min-w-[1000px] border-collapse">
           <thead className="bg-gray-50 dark:bg-gray-800/50">
             <tr>
               <th className="text-left p-2 whitespace-nowrap">Claim ID</th>
-              <th className="text-left p-2 whitespace-nowrap">Procedure</th>
-              <th className="text-left p-2 whitespace-nowrap">Provider Type</th>
+              <th className="text-left p-2 whitespace-nowrap">Patient ID</th>
+              <th className="text-center p-2 whitespace-nowrap">Age</th>
+              <th className="text-center p-2 whitespace-nowrap">Gender</th>
+              <th className="text-left p-2 whitespace-nowrap">Date Admitted</th>
+              <th className="text-left p-2 whitespace-nowrap">
+                Date Discharged
+              </th>
+              <th className="text-left p-2 whitespace-nowrap">Diagnosis</th>
+              <th className="text-left p-2 whitespace-nowrap">Treatment</th>
               <th className="text-right p-2 whitespace-nowrap">Charge ($)</th>
+              <th className="text-left p-2 whitespace-nowrap">Fraud Type</th>
               <th className="text-center p-2 whitespace-nowrap">Fraud Score</th>
               <th className="text-left p-2 whitespace-nowrap">Reasons</th>
-              <th className="text-left p-2 whitespace-nowrap">Service Date</th>
             </tr>
           </thead>
           <tbody>
             {resp?.items.map((item: Claim, idx: number) => (
               <tr
-                key={item.claimId}
+                key={item.claim_id}
                 className={
                   idx % 2 === 0
                     ? "bg-white dark:bg-gray-800"
                     : "bg-gray-50 dark:bg-gray-800/60"
                 }
               >
-                <td className="p-2 whitespace-nowrap">{item.claimId}</td>
+                <td className="p-2 whitespace-nowrap">{item.claim_id}</td>
                 <td className="p-2 whitespace-nowrap">
-                  {item.procedureCode || "-"}
-                </td>
-                <td className="p-2 whitespace-nowrap">
-                  {item.providerType || "-"}
-                </td>
-                <td className="p-2 text-right whitespace-nowrap">
-                  {item.claimCharge.toLocaleString()}
+                  {item.patient_id || "-"}
                 </td>
                 <td className="p-2 text-center whitespace-nowrap">
-                  <ScoreBadge score={item.score} />
+                  {item.age || "-"}
+                </td>
+                <td className="p-2 text-center whitespace-nowrap">
+                  {item.gender || "-"}
+                </td>
+                <td className="p-2 whitespace-nowrap">
+                  {item.date_admitted || "-"}
+                </td>
+                <td className="p-2 whitespace-nowrap">
+                  {item.date_discharged || "-"}
+                </td>
+                <td className="p-2 whitespace-nowrap">
+                  {item.diagnosis || "-"}
+                </td>
+                <td className="p-2 whitespace-nowrap">
+                  {item.treatment || "-"}
+                </td>
+                <td className="p-2 text-right whitespace-nowrap">
+                  {item.claim_charge.toLocaleString()}
+                </td>
+                <td className="p-2 whitespace-nowrap">
+                  {item.fraud_type || "-"}
+                </td>
+                <td className="p-2 text-center whitespace-nowrap">
+                  <ScoreBadge score={item.fraud_score} />
                 </td>
                 <td className="p-2 whitespace-nowrap">
                   <div className="flex flex-col gap-0.5">
-                    {item.reasons.map((reason: string, i: number) => (
+                    {item.fraud_reasons.map((reason: string, i: number) => (
                       <span key={i}>{reason}</span>
                     ))}
                   </div>
-                </td>
-                <td className="p-2 whitespace-nowrap">
-                  {item.serviceDate || "-"}
                 </td>
               </tr>
             ))}
             {!resp?.items?.length && (
               <tr>
-                <td colSpan={7} className="p-4 text-center text-gray-600">
+                <td colSpan={12} className="p-4 text-center text-gray-600">
                   No claims found
                 </td>
               </tr>
@@ -159,6 +216,7 @@ export default function Claims() {
           Next
         </button>
       </div>
+      <OverlayLoader show={loading} label="Loading claims..." />
     </div>
   );
 }

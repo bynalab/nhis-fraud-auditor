@@ -36,8 +36,8 @@ export function computeFraudScore({
   }
 
   if (!providerType) {
-    score += 10;
-    reasons.push("Missing provider type data.");
+    // score += 10;
+    // reasons.push("Missing provider type data.");
   }
 
   if (!procedureCode) {

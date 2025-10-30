@@ -6,16 +6,7 @@ import Metrics from "../components/Metrics";
 import ScoreChart from "../components/ScoreChart";
 import Modal from "../components/Modal";
 import CsvPreviewTable from "../components/CsvPreviewTable";
-
-type MetricsResp = {
-  metrics: {
-    totalClaims: number;
-    averageClaimCharge: number;
-    flaggedCount: number;
-    flaggedPercent: number;
-  };
-  distribution: { low: number; medium: number; high: number };
-};
+import OverlayLoader from "../components/OverlayLoader";
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -24,13 +15,10 @@ export default function Dashboard() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const metricsQuery = useQuery({
+  const { data, error, isLoading } = useQuery({
     queryKey: ["metrics"],
     queryFn: api.getMetrics,
   });
-  const data = metricsQuery.data as MetricsResp | undefined;
-  const error = metricsQuery.error as unknown;
-  const isLoading = metricsQuery.isLoading as boolean;
 
   const openFileDialog = useCallback(() => {
     fileInputRef.current?.click();
@@ -89,7 +77,7 @@ export default function Dashboard() {
 
   if (error instanceof Error)
     return <div className="text-red-600">Error: {error.message}</div>;
-  if (isLoading || !data) return <div>Loading...</div>;
+  if (!data) return <div>Loading...</div>;
 
   return (
     <div className="flex flex-col gap-4">
@@ -139,6 +127,10 @@ export default function Dashboard() {
       )}
       <Metrics {...data.metrics} />
       <ScoreChart distribution={data.distribution} />
+      <OverlayLoader
+        show={isLoading || uploading}
+        label={uploading ? "Uploading..." : "Loading..."}
+      />
     </div>
   );
 }

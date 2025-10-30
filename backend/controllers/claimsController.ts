@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { Op, Sequelize } from "sequelize";
+import { Op, Sequelize, where } from "sequelize";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -30,11 +30,14 @@ export async function listClaims(req: Request, res: Response) {
     const offset = (p - 1) * ps;
 
     const whereClause: any = {};
+
     if (q) {
-      whereClause.procedure_code = { [Op.like]: `%${q}%` };
-    }
-    if (providerType) {
-      whereClause.provider_type = providerType;
+      whereClause[Op.or] = [
+        { diagnosis: { [Op.like]: `%${q}%` } },
+        { treatment: { [Op.like]: `%${q}%` } },
+        { patient_id: { [Op.like]: `%${q}%` } },
+        { fraud_type: { [Op.like]: `%${q}%` } },
+      ];
     }
 
     const { count, rows } = await Claim.findAndCountAll({
@@ -48,13 +51,19 @@ export async function listClaims(req: Request, res: Response) {
     });
 
     const items = rows.map((claim: any) => ({
-      claimId: claim.claim_id,
-      providerType: claim.provider_type,
-      procedureCode: claim.procedure_code,
-      claimCharge: Math.round(claim.claim_charge),
-      score: claim.fraud_score ?? 0,
-      reasons: claim.fraud_reasons ? JSON.parse(claim.fraud_reasons) : [],
-      serviceDate: claim.claim_date,
+      claim_id: claim.claim_id,
+      patient_id: claim.patient_id,
+      age: claim.age,
+      gender: claim.gender,
+      date_admitted: claim.date_admitted,
+      date_discharged: claim.date_discharged,
+      diagnosis: claim.diagnosis,
+      treatment: claim.treatment,
+      claim_charge: Math.round(claim.claim_charge),
+      fraud_type: claim.fraud_type,
+      fraud_score: claim.fraud_score ?? 0,
+      fraud_category: claim.fraud_category,
+      fraud_reasons: claim.fraud_reasons ? JSON.parse(claim.fraud_reasons) : [],
     }));
 
     res.status(200).json({ page: p, pageSize: ps, total: count, items });
@@ -79,15 +88,25 @@ export async function uploadClaims(req: Request, res: Response) {
     }) as any[];
 
     // ✅ Normalize & prepare claims
-    const claimsToInsert = records.map((r) => ({
-      claim_id: r.claim_id || r.claimId,
-      patient_id: r.patient_id || null,
-      provider_id: r.provider_id || null,
-      provider_type: r.provider_type || null,
-      procedure_code: r.procedure_code || null,
-      claim_charge: Number(r.claim_charge || r.claimCharge || "0"),
-      claim_date: r.service_date || r.claim_date || null,
-    }));
+    const claimsToInsert = records.map((r) => {
+      const treatment = r["Treatment"] || null;
+      return {
+        claim_id: r["Claim ID"] || r["Patient ID"],
+        patient_id: r["Patient ID"] || null,
+        age: r["Age"] ? Number(r["Age"]) : null,
+        gender: r["Gender"] || null,
+        date_admitted: r["Date Admitted"] || null,
+        date_discharged: r["Date Discharged"] || null,
+        diagnosis: r["Diagnosis"] || null,
+        treatment: treatment,
+        claim_charge: Number(r["Amount Billed"] || r["Claim Charge"] || "0"),
+        fraud_type: r["Fraud Type"] || null,
+        // Legacy fields for backward compatibility with fraud detection
+        procedure_code: treatment, // map treatment to procedure_code
+        provider_id: r["Provider ID"] || null,
+        provider_type: r["Provider Type"] || null,
+      };
+    });
 
     // ✅ Bulk insert with duplicate ignoring
     await Claim.bulkCreate(claimsToInsert, {

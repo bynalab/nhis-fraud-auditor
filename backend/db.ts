@@ -23,14 +23,20 @@ export class Claim extends Model {
   declare id: number;
   declare claim_id: string;
   declare patient_id: string | null;
-  declare provider_id: string | null;
-  declare provider_type: string | null;
-  declare procedure_code: string | null;
+  declare age: number | null;
+  declare gender: string | null;
+  declare date_admitted: string | null;
+  declare date_discharged: string | null;
+  declare diagnosis: string | null;
+  declare treatment: string | null;
   declare claim_charge: number; // dollars, REAL
-  declare claim_date: string | null;
+  declare fraud_type: string | null;
   declare fraud_score: number;
   declare fraud_category: "Low" | "Medium" | "High" | null;
   declare fraud_reasons: string | null;
+  declare procedure_code: string | null; // legacy field, maps to treatment
+  declare provider_id: string | null; // legacy field for fraud detection
+  declare provider_type: string | null; // legacy field for fraud detection
   declare created_at: Date;
 }
 
@@ -42,32 +48,44 @@ Claim.init(
       autoIncrement: true,
     },
     claim_id: {
-      type: DataTypes.TEXT,
+      type: DataTypes.STRING,
       allowNull: false,
       unique: true,
     },
     patient_id: {
-      type: DataTypes.TEXT,
+      type: DataTypes.STRING,
       allowNull: true,
     },
-    provider_id: {
-      type: DataTypes.TEXT,
+    age: {
+      type: DataTypes.INTEGER,
       allowNull: true,
     },
-    provider_type: {
-      type: DataTypes.TEXT,
+    gender: {
+      type: DataTypes.STRING,
       allowNull: true,
     },
-    procedure_code: {
-      type: DataTypes.TEXT,
+    date_admitted: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    date_discharged: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    diagnosis: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    treatment: {
+      type: DataTypes.STRING,
       allowNull: true,
     },
     claim_charge: {
-      type: DataTypes.REAL,
+      type: DataTypes.FLOAT,
       allowNull: false,
     },
-    claim_date: {
-      type: DataTypes.TEXT,
+    fraud_type: {
+      type: DataTypes.STRING,
       allowNull: true,
     },
     fraud_score: {
@@ -76,7 +94,7 @@ Claim.init(
       defaultValue: 0,
     },
     fraud_category: {
-      type: DataTypes.TEXT,
+      type: DataTypes.STRING,
       allowNull: true,
       validate: {
         isIn: [["Low", "Medium", "High"]],
@@ -84,6 +102,18 @@ Claim.init(
     },
     fraud_reasons: {
       type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    procedure_code: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    provider_id: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    provider_type: {
+      type: DataTypes.STRING,
       allowNull: true,
     },
     created_at: {
@@ -163,9 +193,12 @@ export async function initializeDatabase() {
 export type ClaimRow = {
   claim_id: string;
   patient_id: string | null;
-  provider_id: string | null;
-  provider_type: string | null;
-  procedure_code: string | null;
+  age: number | null;
+  gender: string | null;
+  date_admitted: string | null;
+  date_discharged: string | null;
+  diagnosis: string | null;
+  treatment: string | null;
   claim_charge: number; // dollars
-  claim_date: string | null;
+  fraud_type: string | null;
 };

@@ -3,6 +3,7 @@ import { initializeDatabase } from "./db";
 import claimsRouter from "./routes/claims";
 import metricsRouter from "./routes/metrics";
 import adminRouter from "./routes/admin";
+import cors from "cors";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,17 +12,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS middleware for frontend
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
-  );
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-  if (req.method === "OPTIONS") return res.sendStatus(200);
-  next();
-});
+app.use(cors({ origin: "*" }));
 
 // Health check
 app.get("/health", (req: Request, res: Response) => {
